@@ -21,3 +21,71 @@
 // 3. content-type仅限于text/plain、multipart/form-data、application/x-www-form-urlencoded三者之一
 // 4. 请求中没有使用ReadableStream对象
 // 5. 请求中的任意XMLHttpRequestUpload 对象均没有注册任何事件监听器；
+
+
+// 服务器端要要做的事情
+// 告诉浏览器，我支持哪些域，支持哪些请求方式，支持哪些头
+// 这些参数是可配置的
+/*
+{
+    allowOrigin: 'origin1,origin2'                                  // Access-Control-Allow-Origin
+    exposeHeaders: 'X-My-Custom-Header,X-Another-Customer-Header',  // Access-Control-Expose-Headers
+    maxAge: 1500,                                                   // Access-Control-Max-Age (preflight request)
+    credentials: true,                                              // Access-Control-Allow-Credentials 
+    allowMethods: 'PUT,GET,POST',                                   // Access-Control-Allow-Methods (preflight request)
+    allowHeaders: 'xxx',                                            // Access-Control-Allow-Headers (preflight request)
+}
+*/
+
+function cors(options) {
+    const defOpts = {
+        allowOrigin: '*',
+        maxAge: 3600
+    };
+    options = Object.assign({}, defOpts, options);
+
+    return async function(ctx, next) {
+        let method = ctx.method;
+
+        if (options.allowOrigin != '*') {
+            ctx.set('Vary', 'Origin');
+        }
+
+        if (options.exposeHeaders) {
+            ctx.set('Access-Control-Expose-Headers', options.exposeHeaders);
+        }
+
+        if (options.credentials) {
+            ctx.set('Access-Control-Allow-Credentials', options.credentials);
+        }
+
+        if (method !== 'OPTIONS') {
+            // simple request
+            // 直接告诉客户端： Access-Control-Allow-Origin
+            ctx.set('Access-Control-Allow-Origin', options.allowOrigin);
+            return await next();
+        } else {
+
+            // preflight request
+            
+            if (!ctx.get('Access-Control-Request-Method')) {
+                // 跨域请求会带有Access-Control-Request-Method header
+                return await next();
+            }
+            if (options.maxAge) {
+                ctx.set('Access-Control-Max-Age', options.maxAge);
+            }
+
+
+            if (options.allowMethods) {
+                ctx.set('Access-Control-Allow-Methods', options.allowMethods);
+            }
+
+            if (options.allowHeaders) {
+                ctx.set('Access-Control-Allow-Headers', options.allowHeaders);
+            }
+
+            return await next();
+        }
+    }
+}
